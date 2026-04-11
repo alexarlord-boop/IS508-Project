@@ -13,7 +13,7 @@ def code(text): return nbf.v4.new_code_cell(text)
 cells = []
 
 # ── TITLE ────────────────────────────────────────────────────────────────────
-cells.append(md("""# 🥩 Magic Kitchens Meat Loaf Mix — Sales Forecasting Analysis
+cells.append(md("""# Magic Kitchens Meat Loaf Mix — Sales Forecasting Analysis
 **IS508 · Big Data and Analytics · Group Assignment**
 
 **Role:** Sally Bunn, Brand Manager, United Food Products
@@ -391,7 +391,7 @@ cells.append(md("""## 6 · Answering the 3 Case Questions
 
 ---
 
-### Q1: If Sally has $1,000, should she spend it on advertising or promotion?"""))
+### Q1: If Sally has \$1,000, should she spend it on advertising or promotion?"""))
 cells.append(code("""\
 p = best_model.params
 pv = best_model.pvalues
@@ -600,18 +600,18 @@ cells.append(md("""## 8 · Executive Summary for Sally Bunn
 
 | What drives sales | Finding |
 |---|---|
-| **Promotion (immediate)** | +$6.51K per $1K spent ★ significant |
-| **Promotion (next quarter)** | −$3.41K per $1K spent (stockpiling!) ★ significant |
-| **Advertising (immediate)** | +$2.64K per $1K spent ★ significant |
-| **Advertising (next quarter)** | +$2.78K per $1K spent ★ significant |
-| **Economic index** | −$4.92K per index point (p=0.053 — borderline) |
+| **Promotion (immediate)** | +\$6.51K per \$1K spent ★ significant |
+| **Promotion (next quarter)** | −\$3.41K per \$1K spent (stockpiling!) ★ significant |
+| **Advertising (immediate)** | +\$2.64K per \$1K spent ★ significant |
+| **Advertising (next quarter)** | +\$2.78K per \$1K spent ★ significant |
+| **Economic index** | −\$4.92K per index point (p=0.053 — borderline) |
 | **Seasonal dummies** | Not statistically significant at 5% |
 
 ---
 
-### Q1 — $1K Recommendation: **ADVERTISE** (net +$5.41K) > Promote (net +$3.10K)
+### Q1 — \$1K Recommendation: **ADVERTISE** (net +\$5.41K) > Promote (net +\$3.10K)
 
-**Why:** Promotion creates a visible sales spike *this* quarter, but depresses the *next* quarter. The promotion effect nets out to +$3.1K/1K. Advertising compounds: +$2.64K now AND +$2.78K next quarter = **+$5.41K net**.
+**Why:** Promotion creates a visible sales spike *this* quarter, but depresses the *next* quarter. The promotion effect nets out to +\$3.1K/\$1K. Advertising compounds: +\$2.64K now AND +\$2.78K next quarter = **+\$5.41K net**.
 
 ### Q2 — Counter-cyclical: **Suggestive but borderline** (p = 0.053)
 
