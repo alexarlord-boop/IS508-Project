@@ -97,6 +97,7 @@ print(comp)
 
 best_name = comp['Adj R²'].idxmax()
 best_model = models[best_name]
+best_predictors = [v for v in best_model.model.exog_names if v != 'const']
 print(f"\n★ Best model: {best_name} (Adj R² = {comp.loc[best_name, 'Adj R²']:.4f})")
 
 # ── 4. CASE QUESTIONS ─────────────────────────────────────────────────────────
@@ -108,10 +109,10 @@ params = best_model.params
 pvals  = best_model.pvalues
 
 print("\n── Q1: $1,000 on Advertising or Promotion? ──")
-prom_coef      = params.get('prom', None)
-adv_coef       = params.get('adv', None)
-prom_lag_coef  = params.get('prom_lag1', None)
-adv_lag_coef   = params.get('adv_lag1', None)
+prom_coef      = float(params.get('prom', 0) or 0)
+adv_coef       = float(params.get('adv', 0) or 0)
+prom_lag_coef  = float(params.get('prom_lag1', 0) or 0)
+adv_lag_coef   = float(params.get('adv_lag1', 0) or 0)
 
 prom_sig = pvals.get('prom', 1) < 0.05
 adv_sig  = pvals.get('adv', 1)  < 0.05
@@ -129,7 +130,7 @@ total_prom = (prom_coef or 0) + (prom_lag_coef or 0)
 total_adv  = (adv_coef  or 0) + (adv_lag_coef  or 0)
 print(f"\n  Total prom effect per $1K (current + lag): ${total_prom:.2f}K in sales")
 print(f"  Total adv  effect per $1K (current + lag): ${total_adv:.2f}K in sales")
-print("\n  → RECOMMENDATION: Spend on " + ("PROMOTION" if total_prom > total_adv else "ADVERTISING"))
+print("\n  → RECOMMENDATION: Spend on " + ("ADVERTISING" if total_adv >= total_prom else "PROMOTION"))
 
 print("\n── Q2: Is Meat Loaf Mix Counter-Cyclical? ──")
 index_coef = params.get('index', None)
@@ -203,7 +204,7 @@ for c_idx, col in enumerate(['sales', 'prom', 'adv', 'index'], 2):
 print("✓ Data sheet written")
 
 # Sheet 2: Best Model Regression
-ws_reg = wb.create_sheet("Best Model Regression")
+ws_reg = wb.create_sheet("Regression Results")
 ws_reg.merge_cells('A1:G1')
 title_cell = ws_reg['A1']
 title_cell.value     = f"OLS Regression Results — {best_name}"
@@ -271,7 +272,7 @@ ws_comp.cell(row=r_idx + 2, column=1, value=f'★ Best model: {best_name}').font
 print("✓ Model comparison sheet written")
 
 # Sheet 4: Case Question Answers
-ws_qa = wb.create_sheet("Case Question Answers")
+ws_qa = wb.create_sheet("Case Answers")
 ws_qa.merge_cells('A1:C1')
 ws_qa['A1'].value     = 'Magic Kitchens — Case Question Answers'
 ws_qa['A1'].font      = Font(bold=True, size=13, color="FFFFFF")
@@ -290,7 +291,7 @@ def qa_row(ws, row_num, question, value, interpretation):
 
 prom_total = (params.get('prom', 0) or 0) + (params.get('prom_lag1', 0) or 0)
 adv_total  = (params.get('adv',  0) or 0) + (params.get('adv_lag1',  0) or 0)
-q1_rec = "PROMOTION" if prom_total > adv_total else "ADVERTISING"
+q1_rec = "ADVERTISING" if adv_total >= prom_total else "PROMOTION"
 
 qa_row(ws_qa, 3,
        'Q1: Prom or Adv ($1K)?',
@@ -325,58 +326,72 @@ mean_adv   = df['adv'].mean()
 mean_index = df['index'].mean()
 last_prom  = df['prom'].iloc[-1]
 last_adv   = df['adv'].iloc[-1]
+total_spend = mean_prom + mean_adv
+
+scenario_profiles = {
+    'Baseline': {'prom': mean_prom, 'adv': mean_adv},
+    'Advertising-led': {'prom': round(total_spend * 0.30, 2), 'adv': round(total_spend * 0.70, 2)},
+    'Promotion-led': {'prom': round(total_spend * 0.70, 2), 'adv': round(total_spend * 0.30, 2)},
+}
 
 forecast_rows = []
-for i, q_num in enumerate([1, 2, 3, 4], start=1):
-    row = {
-        'obs':       24 + i,
-        'quarter':   f'Q{q_num} (Forecast)',
-        'prom':      mean_prom,
-        'adv':       mean_adv,
-        'index':     mean_index,
-        'prom_lag1': last_prom if i == 1 else mean_prom,
-        'adv_lag1':  last_adv  if i == 1 else mean_adv,
-        'Q1': int(q_num == 1),
-        'Q2': int(q_num == 2),
-        'Q3': int(q_num == 3),
-    }
-    forecast_rows.append(row)
+for scenario_name, spends in scenario_profiles.items():
+    prev_prom = last_prom
+    prev_adv = last_adv
+    for i, q_num in enumerate([1, 2, 3, 4], start=1):
+        row = {
+            'scenario': scenario_name,
+            'obs': 24 + len(forecast_rows) + 1,
+            'quarter': f'Q{q_num}',
+            'prom': spends['prom'],
+            'adv': spends['adv'],
+            'index': mean_index,
+            'prom_lag1': prev_prom,
+            'adv_lag1': prev_adv,
+            'Q1': int(q_num == 1),
+            'Q2': int(q_num == 2),
+            'Q3': int(q_num == 3),
+        }
+        forecast_rows.append(row)
+        prev_prom = spends['prom']
+        prev_adv = spends['adv']
 
 fc_df = pd.DataFrame(forecast_rows)
-
-best_predictors = [v for v in best_model.params.index if v != 'const']
 fc_X = sm.add_constant(fc_df[best_predictors], has_constant='add')
 fc_df['forecast_sales'] = best_model.predict(fc_X)
+fc_df['total_spend'] = fc_df['prom'] + fc_df['adv']
 
-print("\n── 4-Quarter Sales Forecast ──")
-print(fc_df[['quarter', 'forecast_sales']].to_string(index=False))
+print("\n── Scenario Forecasts ──")
+print(fc_df[['scenario', 'quarter', 'forecast_sales']].to_string(index=False))
 
 # Forecast sheet (Sheet 5)
-ws_fc = wb.create_sheet("4-Quarter Forecast")
-ws_fc.merge_cells('A1:D1')
-ws_fc['A1'].value     = '4-Quarter Sales Forecast (Mean Spend Baseline)'
+ws_fc = wb.create_sheet("Forecast")
+ws_fc.merge_cells('A1:F1')
+ws_fc['A1'].value     = 'Scenario Forecast (Constant Total Spend)'
 ws_fc['A1'].font      = Font(bold=True, size=13, color="FFFFFF")
 ws_fc['A1'].fill      = header_fill
 ws_fc['A1'].alignment = center
 
-for col, h in enumerate(['Quarter', 'Forecast Sales ($K)', 'Prom Used ($K)', 'Adv Used ($K)'], 1):
+for col, h in enumerate(['Scenario', 'Quarter', 'Forecast Sales ($K)', 'Prom ($K)', 'Adv ($K)', 'Total Spend ($K)'], 1):
     style_header(ws_fc.cell(row=3, column=col, value=h))
-    ws_fc.column_dimensions[get_column_letter(col)].width = 22
+    ws_fc.column_dimensions[get_column_letter(col)].width = 20
 
 for r_idx, (_, row) in enumerate(fc_df.iterrows(), 4):
-    ws_fc.cell(row=r_idx, column=1, value=row['quarter'])
-    ws_fc.cell(row=r_idx, column=2, value=round(row['forecast_sales'], 2))
-    ws_fc.cell(row=r_idx, column=3, value=round(row['prom'], 2))
-    ws_fc.cell(row=r_idx, column=4, value=round(row['adv'], 2))
-    for c_idx in range(1, 5):
+    ws_fc.cell(row=r_idx, column=1, value=row['scenario'])
+    ws_fc.cell(row=r_idx, column=2, value=row['quarter'])
+    ws_fc.cell(row=r_idx, column=3, value=round(row['forecast_sales'], 2))
+    ws_fc.cell(row=r_idx, column=4, value=round(row['prom'], 2))
+    ws_fc.cell(row=r_idx, column=5, value=round(row['adv'], 2))
+    ws_fc.cell(row=r_idx, column=6, value=round(row['total_spend'], 2))
+    for c_idx in range(1, 7):
         ws_fc.cell(row=r_idx, column=c_idx).border = border
 
-ws_fc.cell(row=9, column=1,
-           value='Note: Forecast uses historical mean spend and index as baseline.').font = Font(italic=True)
+ws_fc.cell(row=17, column=1,
+           value='Note: Baseline preserves the historical mean mix; alternative scenarios keep total spend constant and change only the mix.').font = Font(italic=True)
 print("✓ Forecast sheet written")
 
 # ── SAVE ──────────────────────────────────────────────────────────────────────
-output_path = 'output/magic_kitchens_output.xlsx'
+output_path = 'output/magic_kitchens_analysis.xlsx'
 wb.save(output_path)
 print(f"\n✓ Excel output saved → {output_path}")
-print("  Sheets: Data | Best Model Regression | Model Comparison | Case Question Answers | 4-Quarter Forecast")
+print("  Sheets: Data | Regression Results | Model Comparison | Case Answers | Forecast")
