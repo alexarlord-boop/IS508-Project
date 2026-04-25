@@ -112,6 +112,15 @@ print(f"Quarters with $0 promotion: {(df['prom'] == 0).sum()}")
 print(f"Quarters with $0 advertising: {(df['adv'] == 0).sum()}")
 """))
 
+cells.append(md("""### 2b.1 · Policy contradiction and modelling implication
+
+The case statement says Sally should **promote OR advertise**, implying the two channels are alternatives.
+However, the historical data show that many quarters have **both** promotion and advertising spending.
+
+That matters analytically: this is not a clean A/B experiment. Instead, the regression has to estimate the
+**marginal effect** of each channel while controlling for the other channel, plus lags and seasonality.
+So the coefficients answer: *holding the other channel constant, what is the incremental effect?*"""))
+
 cells.append(md("### 2c · Do higher promotion/ad spends lead to higher sales? (scatter plots)"))
 cells.append(code("""\
 fig, axes = plt.subplots(1, 3, figsize=(14, 4))
@@ -421,6 +430,8 @@ print()
 print("Why? Promotion has a LARGER immediate pop (+$6.51K) but a significant NEGATIVE")
 print("lag effect (-$3.41K). Brokers stockpile during promotions, then go quiet.")
 print("Advertising's effects COMPOUND: +$2.64K now, +$2.78K next quarter.")
+print("Decision strength: the advertising recommendation is supported by the net two-quarter effect,")
+print("while both immediate effects are statistically significant.")
 """))
 
 cells.append(code("""\
@@ -472,6 +483,7 @@ elif idx_pval < 0.10:
     print("  SUGGESTIVE of counter-cyclicality, but evidence is not conclusive at 5%.")
 else:
     print("✗ NOT CONFIRMED at conventional significance levels.")
+print("Decision strength: the sign points the right way, but the evidence is only borderline.")
 
 # Visualise: sales vs economic index with trend
 fig, ax = plt.subplots(figsize=(7, 4))
@@ -512,6 +524,7 @@ else:
     print("✗ NOT CONFIRMED: No seasonal effect reaches p < 0.05.")
     print("  After controlling for promotion, advertising, and economic conditions,")
     print("  seasonal patterns are not statistically evident in this dataset.")
+print("Decision strength: seasonality is not a reliable planning lever here.")
 
 # Seasonal coefficient chart
 fig, ax = plt.subplots(figsize=(7, 4))
@@ -541,31 +554,45 @@ mean_adv   = df['adv'].mean()
 mean_index = df['index'].mean()
 last_prom  = df['prom'].iloc[-1]
 last_adv   = df['adv'].iloc[-1]
+total_spend = mean_prom + mean_adv
+
+scenario_allocations = {
+    'Baseline':        (mean_prom, mean_adv),
+    'Advertising-led': (0.25 * total_spend, 0.75 * total_spend),
+    'Promotion-led':   (0.75 * total_spend, 0.25 * total_spend),
+}
 
 forecast_rows = []
-for i, q_num in enumerate([1, 2, 3, 4], start=1):
-    row = {
-        'quarter':   f'Q{q_num} (Year 7)',
-        'prom':      mean_prom, 'adv': mean_adv, 'index': mean_index,
-        'prom_lag1': last_prom if i == 1 else mean_prom,
-        'adv_lag1':  last_adv  if i == 1 else mean_adv,
-        'Q1': int(q_num==1), 'Q2': int(q_num==2), 'Q3': int(q_num==3),
-    }
-    forecast_rows.append(row)
+for scenario, (scenario_prom, scenario_adv) in scenario_allocations.items():
+    prev_prom = last_prom
+    prev_adv = last_adv
+    for q_num in [1, 2, 3, 4]:
+        row = {
+            'scenario': scenario,
+            'quarter':   f'Q{q_num} (Year 7)',
+            'prom':      scenario_prom, 'adv': scenario_adv, 'index': mean_index,
+            'prom_lag1': prev_prom,
+            'adv_lag1':  prev_adv,
+            'Q1': int(q_num==1), 'Q2': int(q_num==2), 'Q3': int(q_num==3),
+        }
+        forecast_rows.append(row)
+        prev_prom = scenario_prom
+        prev_adv = scenario_adv
 
 fc_df = pd.DataFrame(forecast_rows)
 best_pred = [v for v in best_model.params.index if v != 'const']
 fc_X = sm.add_constant(fc_df[best_pred], has_constant='add')
 fc_df['Forecast ($K)'] = best_model.predict(fc_X).round(1)
 
-print("4-Quarter Sales Forecast (using historical mean spend as baseline):")
+print("4-Quarter Sales Forecast with constant total spend:")
+print(f"Total future spend held constant at ${total_spend:.1f}K per quarter")
 print()
-display_fc = fc_df[['quarter','Forecast ($K)','prom','adv','index']].copy()
-display_fc.columns = ['Quarter','Forecast ($K)','Prom used ($K)','Adv used ($K)','Index assumed']
+display_fc = fc_df[['scenario','quarter','Forecast ($K)','prom','adv','index']].copy()
+display_fc.columns = ['Scenario','Quarter','Forecast ($K)','Prom used ($K)','Adv used ($K)','Index assumed']
 print(display_fc.to_string(index=False))
 print()
-print(f"Annual forecast total: ${fc_df['Forecast ($K)'].sum():.1f}K")
-print(f"Historical annual avg: ${df['sales'].sum()/6:.1f}K  (24 qtrs / 6 years)")
+for scenario, group in fc_df.groupby('scenario'):
+    print(f"{scenario}: 4-quarter total = ${group['Forecast ($K)'].sum():.1f}K")
 """))
 
 cells.append(code("""\
@@ -577,17 +604,17 @@ ax.plot(df['obs'], df['sales'], marker='o', linewidth=1.8, color='steelblue',
         label='Historical Sales', zorder=3)
 
 # Forecast
+scenario_colors = {'Baseline': 'grey', 'Advertising-led': 'tomato', 'Promotion-led': 'seagreen'}
 fc_obs = [24 + i for i in range(1, 5)]
-ax.plot(fc_obs, fc_df['Forecast ($K)'], marker='D', linewidth=2,
-        linestyle='--', color='tomato', markersize=8, label='Forecast', zorder=3)
-ax.fill_between(fc_obs, fc_df['Forecast ($K)'] * 0.85, fc_df['Forecast ($K)'] * 1.15,
-                alpha=0.15, color='tomato', label='±15% uncertainty band')
+for scenario, group in fc_df.groupby('scenario'):
+    ax.plot(fc_obs, group['Forecast ($K)'], marker='D', linewidth=2,
+            linestyle='--', color=scenario_colors[scenario], markersize=7, label=scenario, zorder=3)
 
 ax.axvline(24.5, color='grey', linestyle=':', linewidth=1.5)
-ax.text(24.7, ax.get_ylim()[0]+20, '← Historical | Forecast →', fontsize=9, color='grey')
+ax.text(24.7, ax.get_ylim()[0]+20, '← Historical | Scenario forecasts →', fontsize=9, color='grey')
 ax.set_xlabel('Quarter')
 ax.set_ylabel('Sales ($K)')
-ax.set_title('Magic Kitchens Sales — Historical + 4-Quarter Forecast')
+ax.set_title('Magic Kitchens Sales — Historical + Scenario Forecasts')
 ax.legend(fontsize=9)
 plt.tight_layout()
 plt.show()
@@ -611,20 +638,20 @@ cells.append(md("""## 8 · Executive Summary for Sally Bunn
 
 ### Q1 — \$1K Recommendation: **ADVERTISE** (net +\$5.41K) > Promote (net +\$3.10K)
 
-**Why:** Promotion creates a visible sales spike *this* quarter, but depresses the *next* quarter. The promotion effect nets out to +\$3.1K/\$1K. Advertising compounds: +\$2.64K now AND +\$2.78K next quarter = **+\$5.41K net**.
+**Why:** Promotion creates a visible sales spike *this* quarter, but depresses the *next* quarter. The promotion effect nets out to +\$3.1K/\$1K. Advertising compounds: +\$2.64K now AND +\$2.78K next quarter = **+\$5.41K net**. That net two-quarter effect is the clearest basis for the recommendation.
 
 ### Q2 — Counter-cyclical: **Suggestive but borderline** (p = 0.053)
 
-The coefficient is negative (worse economy → more meat loaf sold), consistent with the economist's theory, but it just misses the 5% significance threshold. Sally should not bank on it but should monitor economic conditions.
+The coefficient is negative (worse economy → more meat loaf sold), consistent with the economist's theory, but it just misses the 5% significance threshold. Sally should treat this as directionally useful but not decisive evidence.
 
 ### Q3 — Seasonal effects: **Not confirmed** in this dataset
 
-After controlling for spend, no season significantly outperforms another. The cold-weather theory is plausible but unproven at 5% significance with 24 quarters of data.
+After controlling for spend, no season significantly outperforms another. The cold-weather theory is plausible but unproven at 5% significance with 24 quarters of data, so seasonality should not drive the plan.
 """))
 
 nb.cells = cells
 
 import json, pathlib
-out_path = pathlib.Path('/Users/alex.petrunin/IS508 Project/analysis/magic_kitchens_analysis.ipynb')
+out_path = pathlib.Path(__file__).resolve().parent / 'magic_kitchens_analysis.ipynb'
 out_path.write_text(nbf.writes(nb))
 print(f"Notebook written → {out_path}")
