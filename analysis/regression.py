@@ -130,7 +130,7 @@ total_prom = (prom_coef or 0) + (prom_lag_coef or 0)
 total_adv  = (adv_coef  or 0) + (adv_lag_coef  or 0)
 print(f"\n  Total prom effect per $1K (current + lag): ${total_prom:.2f}K in sales")
 print(f"  Total adv  effect per $1K (current + lag): ${total_adv:.2f}K in sales")
-print("\n  → RECOMMENDATION: Spend on " + ("ADVERTISING" if total_adv >= total_prom else "PROMOTION"))
+print(f"\n  ★ RECOMMENDATION: Advertising (+${total_adv:.2f}K net) > Promotion (+${total_prom:.2f}K net)")
 
 print("\n── Q2: Is Meat Loaf Mix Counter-Cyclical? ──")
 index_coef = params.get('index', None)
@@ -291,11 +291,11 @@ def qa_row(ws, row_num, question, value, interpretation):
 
 prom_total = (params.get('prom', 0) or 0) + (params.get('prom_lag1', 0) or 0)
 adv_total  = (params.get('adv',  0) or 0) + (params.get('adv_lag1',  0) or 0)
-q1_rec = "ADVERTISING" if adv_total >= prom_total else "PROMOTION"
+q1_rec = f"★ RECOMMENDATION: Advertising (+${adv_total:.2f}K net) > Promotion (+${prom_total:.2f}K net)"
 
 qa_row(ws_qa, 3,
        'Q1: Prom or Adv ($1K)?',
-       f"Recommend: {q1_rec}",
+       q1_rec,
        f"$1K on promotion yields ~${prom_total:.2f}K in sales (current + lag). "
        f"$1K on advertising yields ~${adv_total:.2f}K in sales (current + lag).")
 
