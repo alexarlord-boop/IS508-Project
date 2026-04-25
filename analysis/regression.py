@@ -291,7 +291,7 @@ def qa_row(ws, row_num, question, value, interpretation):
 
 prom_total = (params.get('prom', 0) or 0) + (params.get('prom_lag1', 0) or 0)
 adv_total  = (params.get('adv',  0) or 0) + (params.get('adv_lag1',  0) or 0)
-q1_rec = "Q1 — $1K Recommendation: ADVERTISE (net +$5.41K) > Promote (net +$3.10K)"
+q1_rec = f"Q1 — $1K Recommendation: ADVERTISE (net +${adv_total:.2f}K) > Promote (net +${prom_total:.2f}K)"
 
 qa_row(ws_qa, 3,
        'Q1: Prom or Adv ($1K)?',
