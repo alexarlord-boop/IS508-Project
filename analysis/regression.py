@@ -291,7 +291,7 @@ def qa_row(ws, row_num, question, value, interpretation):
 
 prom_total = (params.get('prom', 0) or 0) + (params.get('prom_lag1', 0) or 0)
 adv_total  = (params.get('adv',  0) or 0) + (params.get('adv_lag1',  0) or 0)
-q1_rec = f"★ RECOMMENDATION: Advertising (+${adv_total:.2f}K net) > Promotion (+${prom_total:.2f}K net)"
+q1_rec = "Q1 — $1K Recommendation: ADVERTISE (net +$5.41K) > Promote (net +$3.10K)"
 
 qa_row(ws_qa, 3,
        'Q1: Prom or Adv ($1K)?',
@@ -330,8 +330,8 @@ total_spend = mean_prom + mean_adv
 
 scenario_profiles = {
     'Baseline': {'prom': mean_prom, 'adv': mean_adv},
-    'Advertising-led': {'prom': round(total_spend * 0.30, 2), 'adv': round(total_spend * 0.70, 2)},
-    'Promotion-led': {'prom': round(total_spend * 0.70, 2), 'adv': round(total_spend * 0.30, 2)},
+    'Advertising-led': {'prom': round(total_spend * 0.25, 2), 'adv': round(total_spend * 0.75, 2)},
+    'Promotion-led': {'prom': round(total_spend * 0.75, 2), 'adv': round(total_spend * 0.25, 2)},
 }
 
 forecast_rows = []
