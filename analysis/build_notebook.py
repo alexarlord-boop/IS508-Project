@@ -649,6 +649,9 @@ The coefficient is negative (worse economy → more meat loaf sold), consistent 
 After controlling for spend, no season significantly outperforms another. The cold-weather theory is plausible but unproven at 5% significance with 24 quarters of data, so seasonality should not drive the plan.
 """))
 
+for i, cell in enumerate(cells, start=1):
+    cell["id"] = f"cell-{i:03d}"
+
 nb.cells = cells
 
 import json, pathlib
